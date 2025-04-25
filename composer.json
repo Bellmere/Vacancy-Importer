@@ -1,0 +1,14 @@
+{
+  "name": "sauron/vacance-importer",
+  "description": "Plugin to import job vacancies from CSV",
+  "type": "wordpress-plugin",
+  "require": {
+    "league/csv": "^9.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "VacanceImporter\\": "inc/"
+    }
+  }
+}
+
