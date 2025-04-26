@@ -1,24 +1,25 @@
 <?php
 
-namespace VacanceImporter\API;
+namespace VacanceImporter\API\Vacancy\controller;
 
 use WP_Query;
 use WP_REST_Request;
 use WP_REST_Response;
 
 class VacancyController {
-//    =====     Public GET      ======
     public static function register_routes() {
+        $controller = new self();
+
         register_rest_route('digiway/v1', '/vacancies', [
             'methods' => 'GET',
-            'callback' => [self::class, 'get_items'],
+            'callback' => [$controller, 'get_items'],
             'permission_callback' => '__return_true',
         ]);
-//      =======     POST Protect    ========
+
         register_rest_route('digiway/v1', '/vacancies', [
             'methods' => 'POST',
-            'callback' => [self::class, 'add_item'],
-            'permission_callback' => [self::class, 'permissions_check'],
+            'callback' => [$controller, 'add_item'],
+            'permission_callback' => [$controller, 'permissions_check'],
         ]);
     }
 
@@ -26,7 +27,7 @@ class VacancyController {
      * GET /vacancies
      * receive vacancies
      */
-    public static function get_items(WP_REST_Request $request) {
+    public function get_items(WP_REST_Request $request) {
         $city = sanitize_text_field($request->get_param('city'));
         $page = max(1, intval($request->get_param('page')));
         $per_page = intval($request->get_param('per_page')) ?: 10;
@@ -73,9 +74,9 @@ class VacancyController {
 
     /**
      * POST /vacancies
-     * Добавить новую вакансию
+     * Add Vacancy
      */
-    public static function add_item(WP_REST_Request $request) {
+    public function add_item(WP_REST_Request $request) {
         $title = sanitize_text_field($request->get_param('title'));
         $content = sanitize_textarea_field($request->get_param('description'));
         $city = sanitize_text_field($request->get_param('city'));
@@ -109,9 +110,29 @@ class VacancyController {
     }
 
     /**
-     * Permission callback для POST запросов
+     * Permission callback
      */
-    public static function permissions_check($request) {
-        return wp_verify_nonce($request->get_header('X-WP-Nonce'), 'wp_rest') && current_user_can('edit_posts');
+    protected function permissions_check(WP_REST_Request $request) {
+        $valid_nonce = wp_verify_nonce($request->get_header('X-WP-Nonce'), 'wp_rest');
+
+        if (!$valid_nonce) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Vacancy API: Invalid nonce.');
+            }
+            return new \WP_Error('invalid_nonce', 'Invalid security token.', ['status' => 403]);
+        }
+
+        $user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array) $user->roles, true);
+
+        if (!$is_admin) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Vacancy API: User is not an administrator. User ID: ' . $user->ID);
+            }
+            return new \WP_Error('forbidden', 'Only administrators can perform this action.', ['status' => 403]);
+        }
+
+        return true;
     }
+
 }
