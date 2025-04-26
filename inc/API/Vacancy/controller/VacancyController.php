@@ -1,12 +1,26 @@
 <?php
-
+/**
+ * VacancyController
+ *
+ * Test Routes examples:
+ * - GET all vacancies: /wp-json/digiway/v1/vacancies
+ * - GET vacancies by city: /wp-json/digiway/v1/vacancies?city=Краков
+ * - GET vacancies with salary filter: /wp-json/digiway/v1/vacancies?salary_min=4000
+ * - GET vacancies ordered by salary ASC: /wp-json/digiway/v1/vacancies?order_by=salary&order=asc
+ */
 namespace VacanceImporter\API\Vacancy\controller;
 
-use WP_Query;
 use WP_REST_Request;
 use WP_REST_Response;
+use VacanceImporter\API\Vacancy\model\VacancyModel;
 
 class VacancyController {
+    private $model;
+
+    public function __construct() {
+        $this->model = new VacancyModel();
+    }
+
     public static function register_routes() {
         $controller = new self();
 
@@ -23,62 +37,29 @@ class VacancyController {
         ]);
     }
 
-    /**
-     * GET /vacancies
-     * receive vacancies
-     */
     public function get_items(WP_REST_Request $request) {
         $city = sanitize_text_field($request->get_param('city'));
         $page = max(1, intval($request->get_param('page')));
         $per_page = intval($request->get_param('per_page')) ?: 10;
-        $offset = ($page - 1) * $per_page;
+        $salary_min = $request->get_param('salary_min');
+        $salary_max = $request->get_param('salary_max');
+        $order_by = sanitize_text_field($request->get_param('order_by')) ?: 'id';
+        $order = sanitize_text_field($request->get_param('order')) ?: 'DESC';
 
-        $args = [
-            'post_type' => 'vacancy',
-            'posts_per_page' => $per_page,
-            'paged' => $page,
-        ];
+        $salary_min = is_numeric($salary_min) ? (int) $salary_min : null;
+        $salary_max = is_numeric($salary_max) ? (int) $salary_max : null;
 
-        if (!empty($city)) {
-            $args['meta_query'] = [
-                [
-                    'key' => 'city',
-                    'value' => $city,
-                    'compare' => 'LIKE',
-                ],
-            ];
-        }
-
-        $query = new WP_Query($args);
-
-        $vacancies = [];
-
-        foreach ($query->posts as $post) {
-            $vacancies[] = [
-                'id' => $post->ID,
-                'title' => get_the_title($post),
-                'content' => apply_filters('the_content', $post->post_content),
-                'city' => get_field('city', $post->ID),
-                'salary' => get_field('salary', $post->ID),
-                'type_of_employment' => get_field('type_of_employment', $post->ID),
-            ];
-        }
+        $result = $this->model->get_vacancies($city, $per_page, $page, $salary_min, $salary_max, $order_by, $order);
 
         return new WP_REST_Response([
-            'vacancies' => $vacancies,
-            'total' => $query->found_posts,
-            'pages' => $query->max_num_pages,
-            'current_page' => $page,
+            'posts' => $result['posts'],
+            'total' => $result['total'],
         ], 200);
     }
 
-    /**
-     * POST /vacancies
-     * Add Vacancy
-     */
     public function add_item(WP_REST_Request $request) {
         $title = sanitize_text_field($request->get_param('title'));
-        $content = sanitize_textarea_field($request->get_param('description'));
+        $description = sanitize_textarea_field($request->get_param('description'));
         $city = sanitize_text_field($request->get_param('city'));
         $salary = sanitize_text_field($request->get_param('salary'));
         $type_of_employment = sanitize_text_field($request->get_param('type_of_employment'));
@@ -87,52 +68,31 @@ class VacancyController {
             return new WP_REST_Response(['message' => 'Title is required'], 400);
         }
 
-        $post_id = wp_insert_post([
-            'post_type' => 'vacancy',
-            'post_title' => $title,
-            'post_content' => $content,
-            'post_status' => 'publish',
-        ]);
+        $post_id = $this->model->add_or_update_vacancy($title, $description, $city, $salary, $type_of_employment);
 
         if (is_wp_error($post_id)) {
-            return new WP_REST_Response(['message' => 'Error creating vacancy'], 500);
+            return new WP_REST_Response(['message' => 'Error creating/updating vacancy'], 500);
         }
 
-        // Сохраняем ACF поля
-        update_field('city', $city, $post_id);
-        update_field('salary', $salary, $post_id);
-        update_field('type_of_employment', $type_of_employment, $post_id);
-
         return new WP_REST_Response([
-            'message' => 'Vacancy created successfully',
+            'message' => 'Vacancy created or updated successfully',
             'id' => $post_id,
         ], 201);
     }
 
-    /**
-     * Permission callback
-     */
-    protected function permissions_check(WP_REST_Request $request) {
+    public function permissions_check(WP_REST_Request $request) {
         $valid_nonce = wp_verify_nonce($request->get_header('X-WP-Nonce'), 'wp_rest');
-
-        if (!$valid_nonce) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Vacancy API: Invalid nonce.');
-            }
-            return new \WP_Error('invalid_nonce', 'Invalid security token.', ['status' => 403]);
-        }
-
         $user = wp_get_current_user();
         $is_admin = in_array('administrator', (array) $user->roles, true);
 
+        if (!$valid_nonce) {
+            return new \WP_Error('invalid_nonce', 'Invalid security token.', ['status' => 403]);
+        }
+
         if (!$is_admin) {
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Vacancy API: User is not an administrator. User ID: ' . $user->ID);
-            }
             return new \WP_Error('forbidden', 'Only administrators can perform this action.', ['status' => 403]);
         }
 
         return true;
     }
-
 }

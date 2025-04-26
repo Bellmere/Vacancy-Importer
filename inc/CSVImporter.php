@@ -20,6 +20,8 @@ class CSVImporter {
                 continue;
             }
 
+            $salary_clean = (int) preg_replace('/[^0-9]/', '', $salary);
+
             //  =====   Cheking Dublicates  =====
             $existing = get_posts([
                 'post_type'  => 'vacancy',
@@ -55,7 +57,7 @@ class CSVImporter {
             if (!is_wp_error($post_id)) {
                 //  =====   Save ACF Fields =====
                 update_field('city', sanitize_text_field($city), $post_id);
-                update_field('salary', sanitize_text_field($salary), $post_id);
+                update_field('salary', $salary_clean, $post_id);
                 update_field('type_of_employment', sanitize_text_field($type_of_employment), $post_id);
             }
         }

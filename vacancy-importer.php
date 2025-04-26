@@ -6,28 +6,33 @@
  * Author: Saur0n
  */
 
-use VacanceImporter\CSVImporter;
+use VacanceImporter\PostTypeRegister;
+use VacanceImporter\AcfFieldsRegister;
+use VacanceImporter\AdminPage;
 
-if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
-add_action('admin_init', function() {
-    if (isset($_GET['import_vacancies']) && current_user_can('manage_options')) {
-        $importer = new CSVImporter();
-        $importer->import(plugin_dir_path(__FILE__) . 'vacancies_pl_60.csv');
+// CPT и ACF при активации
+register_activation_hook(__FILE__, function() {
+    PostTypeRegister::register();
+    if (function_exists('acf_add_local_field_group')) {
+        AcfFieldsRegister::register();
     }
 });
 
+// CPT каждый раз при init
 add_action('init', function() {
-    register_post_type('vacancy', [
-        'labels' => [
-            'name' => 'Vacancies',
-            'singular_name' => 'Vacancy',
-        ],
-        'public' => true,
-        'has_archive' => true,
-        'show_in_rest' => true,
-        'supports' => ['title', 'editor'],
-    ]);
+    PostTypeRegister::register();
+});
+
+// Проверка и регистрация ACF полей
+add_action('acf/init', function() {
+    AcfFieldsRegister::register();
+});
+
+// Добавление страницы в админку
+add_action('admin_menu', function() {
+    AdminPage::register();
 });
