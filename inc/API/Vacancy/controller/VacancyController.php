@@ -35,6 +35,12 @@ class VacancyController {
             'callback' => [$controller, 'add_item'],
             'permission_callback' => [$controller, 'permissions_check'],
         ]);
+
+        register_rest_route('digiway/v1', '/vacancies/cities', [
+            'methods' => 'GET',
+            'callback' => [$controller, 'get_unique_cities'],
+            'permission_callback' => '__return_true',
+        ]);
     }
 
     public function get_items(WP_REST_Request $request) {
@@ -79,6 +85,26 @@ class VacancyController {
             'id' => $post_id,
         ], 201);
     }
+
+    public function get_unique_cities() {
+        $cities = $this->model->get_unique_cities();
+
+        if (!is_array($cities)) {
+            return new WP_REST_Response([], 200);
+        }
+
+        $cities = array_filter($cities, function($city) {
+            return !empty($city);
+        });
+
+        $cities = array_unique($cities);
+
+        sort($cities);
+
+        return new WP_REST_Response(array_values($cities), 200);
+    }
+
+
 
     public function permissions_check(WP_REST_Request $request) {
         $valid_nonce = wp_verify_nonce($request->get_header('X-WP-Nonce'), 'wp_rest');

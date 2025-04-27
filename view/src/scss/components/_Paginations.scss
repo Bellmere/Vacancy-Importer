@@ -1,0 +1,32 @@
+@use "../abstracts" as *;
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  &__button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    cursor: pointer;
+    padding: 4px 8px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    line-height: 1.4;
+    font-weight: 500;
+    border-radius: 4px;
+    transition: all 0.3s ease-in-out;
+
+    &.active {
+      background-color: $light-pink;
+    }
+
+    &:hover {
+      background-color: $light-pink;
+    }
+  }
+}

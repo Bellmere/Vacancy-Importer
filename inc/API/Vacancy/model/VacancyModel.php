@@ -123,4 +123,16 @@ class VacancyModel {
 
         return $post_id;
     }
+
+    public function get_unique_cities() {
+        $cities = $this->wpdb->get_col("
+        SELECT DISTINCT meta_value 
+        FROM {$this->wpdb->postmeta} 
+        WHERE meta_key = 'city'
+          AND meta_value != ''
+    ");
+
+        return array_filter($cities);
+    }
+
 }

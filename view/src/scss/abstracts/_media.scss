@@ -1,0 +1,21 @@
+$max-mobile: 991px;
+$mobile: 767px;
+$min-mobile: 479px;
+
+@mixin max-mobile {
+  @media (max-width: $max-mobile) {
+    @content;
+  }
+}
+
+@mixin mobile {
+  @media (max-width: $mobile) {
+    @content;
+  }
+}
+
+@mixin min-mobile {
+  @media (max-width: $min-mobile) {
+    @content;
+  }
+}
